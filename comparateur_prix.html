@@ -5,7 +5,7 @@
     🛒 COMPARATEUR DE PRIX — calculateur de courses multi-magasins
     ========================================
 
-    VERSION : 2.0.0  (8 octobre 2026)
+    VERSION : 2.1.0  (8 octobre 2026)
 
     À CHAQUE MODIFICATION :
       1. Changer APP_VERSION plus bas dans le <script>
@@ -14,6 +14,8 @@
          sur le réseau en priorité, donc plus besoin de vider les caches)
 
     HISTORIQUE :
+    - 2.1.0 : Mémoire des prix par magasin (suggestions, comparaison, évolution),
+              liste à cocher « dans le caddie », budget avec barre, alerte de mise à jour dans l'APK.
     - 2.0.0 : Refonte complète. Nouveau moteur de promos (2ᵉ à −X %, N+M offerts,
               lot N pour X €, cagnotte), calcul au centime, conseil « encore 1 pour
               déclencher l'offre », UI en cartes pour mobile, onglets par magasin,
@@ -57,6 +59,8 @@
   --tag: #FFD43B;
   --tag-ink: #2B2200;
   --danger: #C4362B;
+  --todo: #F6F7FB;
+  --warn: #C27A00;
   --shadow: 0 1px 2px rgb(20 22 40 / .06), 0 4px 14px rgb(20 22 40 / .05);
   --num: "BSC", "Roboto Condensed", "Arial Narrow", system-ui, sans-serif;
   --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -66,13 +70,13 @@
   :root:not([data-theme="light"]) {
     --bg: #111219; --card: #1B1D26; --field: #252834; --ink: #ECEDF3; --muted: #A0A5B8;
     --line: #2F3242; --brand: #8D7DFF; --brand-ink: #130F2C; --save: #4BCB8E;
-    --danger: #FF7468; --shadow: none; color-scheme: dark;
+    --danger: #FF7468; --shadow: none; color-scheme: dark; --todo: #16171F; --warn: #F2B33D;
   }
 }
 :root[data-theme="dark"] {
   --bg: #111219; --card: #1B1D26; --field: #252834; --ink: #ECEDF3; --muted: #A0A5B8;
   --line: #2F3242; --brand: #8D7DFF; --brand-ink: #130F2C; --save: #4BCB8E;
-  --danger: #FF7468; --shadow: none; color-scheme: dark;
+  --danger: #FF7468; --shadow: none; color-scheme: dark; --todo: #16171F; --warn: #F2B33D;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -81,7 +85,7 @@ html, body { overscroll-behavior-y: none; } /* bloque le pull-to-refresh, sans J
 body {
   background: var(--bg); color: var(--ink); font: 16px/1.4 var(--ui);
   min-height: 100dvh; -webkit-tap-highlight-color: transparent;
-  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  padding-bottom: calc(124px + env(safe-area-inset-bottom));
 }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 input, select { font: inherit; color: inherit; }
@@ -179,6 +183,29 @@ header.top { padding: calc(10px + env(safe-area-inset-top)) 0 0; }
 .empty { text-align: center; padding: 28px 16px 8px; color: var(--muted); }
 .empty strong { display: block; color: var(--ink); font-size: 17px; margin-bottom: 4px; }
 
+/* Case « dans le caddie » */
+.check {
+  width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--line); flex: none;
+  display: grid; place-items: center; color: transparent; font-size: 17px; font-weight: 800;
+}
+.check[aria-checked="true"] { background: var(--store, var(--brand)); border-color: var(--store, var(--brand)); color: #fff; }
+.item.todo { background: var(--todo); box-shadow: inset 0 0 0 1.5px var(--line); }
+.item.todo .lt-pay { color: var(--muted); }
+.cmp { font-size: 13px; color: var(--muted); width: 100%; }
+.cmp:empty { display: none; }
+.cmp .good { color: var(--save); font-weight: 600; }
+.cmp .bad { color: var(--danger); font-weight: 600; }
+.cmp button { color: var(--brand); font-weight: 600; font-size: 13px; text-decoration: underline; text-underline-offset: 2px; padding: 2px 0; }
+/* Suggestions sous le nom */
+.name-wrap { position: relative; flex: 1; min-width: 0; display: flex; }
+.sugg {
+  position: absolute; left: 0; right: -44px; top: calc(100% + 4px); z-index: 15; background: var(--card);
+  border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 28px rgb(10 12 30 / .18); overflow: hidden;
+}
+.sugg button { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; width: 100%; padding: 11px 12px; text-align: left; border-bottom: 1px solid var(--line); }
+.sugg button:last-child { border-bottom: 0; }
+.sugg .p { font: 600 15px var(--num); color: var(--muted); white-space: nowrap; }
+
 /* ---------- Récap magasin ---------- */
 .recap { margin-top: 16px; background: var(--card); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow); }
 .recap-row { display: flex; justify-content: space-between; align-items: baseline; padding: 3px 0; color: var(--muted); }
@@ -189,6 +216,7 @@ header.top { padding: calc(10px + env(safe-area-inset-top)) 0 0; }
 .recap-total span:first-child { font-weight: 600; }
 .recap-total .num { font-size: 30px; font-weight: 700; }
 .recap-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+.recap-todo { margin-top: 8px; font-size: 14px; color: var(--muted); }
 .link-btn { color: var(--muted); font-size: 14px; padding: 8px 4px; text-decoration: underline; text-underline-offset: 3px; }
 .link-btn.danger:hover { color: var(--danger); }
 
@@ -202,6 +230,18 @@ header.top { padding: calc(10px + env(safe-area-inset-top)) 0 0; }
 .bt-label { font-size: 13px; color: var(--muted); }
 .bt-total { font: 700 30px/1 var(--num); font-variant-numeric: tabular-nums; }
 .bt-save { font-size: 13px; color: var(--save); font-weight: 600; }
+.bt-area { text-align: left; min-width: 0; flex: 1; }
+.budget { margin-top: 5px; display: grid; gap: 3px; }
+.bar { height: 6px; border-radius: 3px; background: var(--field); overflow: hidden; width: min(230px, 100%); }
+.bar i { display: block; height: 100%; background: var(--save); border-radius: 3px; transition: width .25s; }
+.bar.warn i { background: var(--warn); }
+.bar.over i { background: var(--danger); }
+.bt-budget { font-size: 12px; color: var(--muted); }
+.bt-budget.warn { color: var(--warn); font-weight: 600; }
+.bt-budget.over { color: var(--danger); font-weight: 700; }
+.mem-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.mem-row .sub { grid-column: 1; }
+.mem-row .del { grid-row: 1 / span 2; grid-column: 2; }
 .fab {
   background: var(--brand); color: var(--brand-ink); border-radius: 14px; height: 52px; padding: 0 18px;
   font-weight: 700; display: flex; align-items: center; gap: 6px; white-space: nowrap;
@@ -317,17 +357,19 @@ dialog.sheet::backdrop { background: rgb(8 9 18 / .55); }
     <div class="recap-row save"><span>Économisé</span><span class="num" id="rSaved"></span></div>
     <div class="recap-row cagn" id="rCagRow"><span>Cagnotté (sur ta carte)</span><span class="num" id="rCag"></span></div>
     <div class="recap-total"><span id="rLabel">À payer</span><span class="num" id="rPay"></span></div>
+    <div class="recap-todo" id="rTodo"></div>
     <div class="recap-actions"><button class="link-btn danger" id="clearBtn">Vider la liste de ce magasin</button></div>
   </section>
 </main>
 
 <footer class="bottom">
   <div class="wrap">
-    <div>
-      <div class="bt-label" id="btLabel">Total</div>
+    <button class="bt-area" id="btArea" aria-label="Total et budget">
+      <div class="bt-label" id="btLabel">Dans le caddie</div>
       <div class="bt-total" id="btTotal">0,00 €</div>
       <div class="bt-save" id="btSave"></div>
-    </div>
+      <div class="budget" id="btBudget" hidden><div class="bar" id="btBar"><i></i></div><div class="bt-budget" id="btBudgetTxt"></div></div>
+    </button>
     <button class="fab" id="fab"><b>+</b> Article</button>
   </div>
 </footer>
@@ -368,6 +410,8 @@ dialog.sheet::backdrop { background: rgb(8 9 18 / .55); }
     <div class="menu-list">
       <button class="menu-item" id="mSave"><span class="ic">💾</span><span>Enregistrer dans l'historique<small>Garde une copie des listes de tous les magasins</small></span></button>
       <button class="menu-item" id="mHist"><span class="ic">📋</span><span>Historique<small id="mHistCount"></small></span></button>
+      <button class="menu-item" id="mBudget"><span class="ic">🎯</span><span>Budget<small id="mBudgetTxt"></small></span></button>
+      <button class="menu-item" id="mMem"><span class="ic">🏷️</span><span>Prix mémorisés<small>Les prix retenus pour chaque article et magasin</small></span></button>
       <button class="menu-item" id="mStores"><span class="ic">🏪</span><span>Magasins<small>Ajouter, renommer, masquer</small></span></button>
       <button class="menu-item" id="mExport"><span class="ic">📤</span><span>Exporter une sauvegarde<small>Fichier .json à garder au chaud</small></span></button>
       <button class="menu-item" id="mImport"><span class="ic">📥</span><span>Importer une sauvegarde<small>Accepte aussi les sauvegardes de l'ancienne version</small></span></button>
@@ -397,6 +441,27 @@ dialog.sheet::backdrop { background: rgb(8 9 18 / .55); }
   </div>
 </dialog>
 
+<!-- Budget -->
+<dialog class="sheet" id="budgetSheet" aria-labelledby="budgetTitle">
+  <div class="sh-head"><h2 id="budgetTitle">Budget des courses</h2><button class="close" data-close aria-label="Fermer">✕</button></div>
+  <div class="sh-body">
+    <p class="sub">Pour tous les magasins affichés. La barre en bas se remplit avec ce qui est dans le caddie.</p>
+    <label class="field">Montant (€)<input type="text" id="budgetIn" inputmode="decimal" placeholder="Ex. 80"></label>
+    <div class="chips" id="budgetChips"></div>
+    <div class="btns"><button class="btn" id="budgetOff">Pas de budget</button><button class="btn primary" id="budgetOk">Valider</button></div>
+  </div>
+</dialog>
+
+<!-- Prix mémorisés -->
+<dialog class="sheet" id="memSheet" aria-labelledby="memTitle">
+  <div class="sh-head"><h2 id="memTitle">Prix mémorisés</h2><button class="close" data-close aria-label="Fermer">✕</button></div>
+  <div class="sh-body">
+    <p class="sub">L'app retient le dernier prix saisi pour chaque article, dans chaque magasin. Supprime ici les fautes de frappe.</p>
+    <label class="field">Chercher<input type="text" id="memSearch" placeholder="Nom de l'article"></label>
+    <div id="memList"></div>
+  </div>
+</dialog>
+
 <!-- Historique -->
 <dialog class="sheet" id="histSheet" aria-labelledby="histTitle">
   <div class="sh-head"><h2 id="histTitle">Historique</h2><button class="close" data-close aria-label="Fermer">✕</button></div>
@@ -413,7 +478,7 @@ dialog.sheet::backdrop { background: rgb(8 9 18 / .55); }
 
 <script>
 'use strict';
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 // Vrai quand la page tourne dans l'APK Android (Capacitor), faux dans le navigateur
 const IS_APP = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
 const LS_KEY = 'cp2-state';
@@ -517,13 +582,58 @@ function promoLabel(p) {
   }
   return '';
 }
+// Seuls les articles cochés « dans le caddie » comptent dans le total ;
+// les autres forment le « reste à prendre » (estimé avec les prix connus)
+const inCart = it => it.checked !== false;
 function totalsFor(storeId) {
-  const t = { base: 0, pay: 0, saved: 0, cag: 0, count: 0 };
+  const t = { base: 0, pay: 0, saved: 0, cag: 0, count: 0, todo: 0, todoPay: 0 };
   for (const it of state.items[storeId] || []) {
     const c = lineCalc(it);
-    t.base += c.base; t.pay += c.pay; t.saved += c.saved; t.cag += c.cag; t.count += c.qty;
+    if (inCart(it)) { t.base += c.base; t.pay += c.pay; t.saved += c.saved; t.cag += c.cag; t.count += c.qty; }
+    else if (it.name || it.price) { t.todo++; t.todoPay += c.pay; }
   }
   return t;
+}
+
+/* ============ Mémoire des prix ============ */
+// state.prices[clé] = { name, byStore: { [storeId]: { price (centimes), prev, ts, item } } }
+const normKey = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+const centsToField = c => (c / 100).toFixed(2).replace('.', ',');
+function rememberPrice(storeId, item, opts = {}) {
+  const key = normKey(item.name), c = toCents(item.price);
+  if (key.length < 2 || c <= 0) return;
+  const P = opts.prices || state.prices;
+  // l'article a été renommé : on retire l'ancienne entrée qu'il avait créée (faute de frappe)
+  if (item.memKey && item.memKey !== key && P[item.memKey]) {
+    const old = P[item.memKey].byStore[storeId];
+    if (old && old.item === item.id && !old.prev) delete P[item.memKey].byStore[storeId];
+    if (!Object.keys(P[item.memKey].byStore).length) delete P[item.memKey];
+  }
+  const rec = P[key] || (P[key] = { name: item.name.trim(), byStore: {} });
+  rec.name = item.name.trim();
+  const cur = rec.byStore[storeId];
+  const prev = cur && cur.item !== item.id && cur.price !== c ? cur.price : (cur ? cur.prev : undefined);
+  rec.byStore[storeId] = { price: c, prev, ts: opts.ts || Date.now(), item: item.id };
+  item.memKey = key;
+  if (!opts.silent) save();
+}
+function suggestions(q, storeId) {
+  const k = normKey(q);
+  if (!k) return [];
+  const out = [];
+  for (const [key, rec] of Object.entries(state.prices)) {
+    const i = key.indexOf(k);
+    if (i < 0) continue;
+    const ts = Math.max(...Object.values(rec.byStore).map(r => r.ts || 0));
+    out.push({ key, rec, rank: (i === 0 ? 0 : 1), ts });
+  }
+  return out.sort((a, b) => a.rank - b.rank || b.ts - a.ts).slice(0, 5);
+}
+function buildPricesFromHistory(s) {
+  const prices = s.prices = {};
+  for (const h of [...s.history].sort((a, b) => a.ts - b.ts))
+    for (const st of h.stores) for (const it of st.items) if (inCart(it)) rememberPrice(st.id, { ...it, id: h.id + it.id }, { silent: true, ts: h.ts, prices });
+  for (const st of s.stores) for (const it of s.items[st.id]) if (inCart(it)) rememberPrice(st.id, it, { silent: true, prices });
 }
 
 /* ============ État & sauvegarde ============ */
@@ -535,7 +645,7 @@ function defaultState() {
       { id: 'leclerc', name: "Leclerc Bois d'Arcy", color: '#2F6BDE', enabled: true }
     ],
     items: { auchan: [], leclerc: [] },
-    active: 'auchan', theme: 'auto', history: []
+    active: 'auchan', theme: 'auto', history: [], budget: 0
   };
 }
 function normalize(s) {
@@ -547,10 +657,13 @@ function normalize(s) {
   for (const st of s.stores) {
     s.items[st.id] = (Array.isArray(s.items[st.id]) ? s.items[st.id] : []).map(it => ({
       id: it.id || uid(), name: String(it.name ?? ''), price: String(it.price ?? ''),
-      qty: Math.max(0, Math.floor(num(it.qty))), promo: it.promo && it.promo.type ? it.promo : { type: 'none' }
+      qty: Math.max(0, Math.floor(num(it.qty))), promo: it.promo && it.promo.type ? it.promo : { type: 'none' },
+      checked: it.checked !== false, memKey: it.memKey
     }));
   }
   if (!Array.isArray(s.history)) s.history = [];
+  s.budget = Math.max(0, Math.round(num(s.budget)));
+  if (!s.prices || typeof s.prices !== 'object') buildPricesFromHistory(s);
   if (!['auto', 'light', 'dark'].includes(s.theme)) s.theme = 'auto';
   if (!s.stores.some(x => x.id === s.active && x.enabled)) s.active = (s.stores.find(x => x.enabled) || s.stores[0]).id;
   return s;
@@ -645,15 +758,50 @@ function renderTabs() {
 }
 
 function itemCard(item) {
+  const sid = state.active;
   const card = el('article', { class: 'item', 'data-id': item.id });
   const nameIn = el('input', { class: 'name', type: 'text', placeholder: 'Article', value: item.name, enterkeyhint: 'next', 'aria-label': 'Article', autocomplete: 'off' });
   const priceIn = el('input', { type: 'text', inputmode: 'decimal', placeholder: '0,00', value: item.price, enterkeyhint: 'next', 'aria-label': 'Prix unitaire' });
   const qtyIn = el('input', { type: 'text', inputmode: 'numeric', value: String(item.qty), 'aria-label': 'Quantité', enterkeyhint: 'done' });
   const changed = () => { updateCard(card, item); renderTotals(); save(); };
 
-  nameIn.addEventListener('input', () => { item.name = nameIn.value; save(); });
-  nameIn.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); priceIn.focus(); } });
-  priceIn.addEventListener('input', () => { item.price = priceIn.value.replace(/[^\d.,]/g, ''); if (priceIn.value !== item.price) priceIn.value = item.price; changed(); });
+  // Suggestions d'articles déjà connus
+  const sugg = el('div', { class: 'sugg', hidden: true, role: 'listbox' });
+  const closeSugg = () => { sugg.hidden = true; sugg.replaceChildren(); };
+  const showSugg = () => {
+    const list = suggestions(nameIn.value, sid).filter(x => normKey(x.rec.name) !== normKey(nameIn.value) || !item.price);
+    if (!list.length || document.activeElement !== nameIn) return closeSugg();
+    sugg.replaceChildren(...list.map(({ rec }) => {
+      const here = rec.byStore[sid];
+      const other = Object.entries(rec.byStore).filter(([k]) => k !== sid).map(([k, r]) => ({ st: state.stores.find(x => x.id === k), r })).filter(x => x.st)[0];
+      const priceTxt = here ? money(here.price) : other ? `${other.st.name} ${money(other.r.price)}` : '';
+      return el('button', {
+        type: 'button', role: 'option',
+        onpointerdown: e => e.preventDefault(), // garde le clavier ouvert
+        onclick: () => {
+          item.name = rec.name; nameIn.value = rec.name;
+          if (here && !toCents(item.price)) { item.price = centsToField(here.price); priceIn.value = item.price; }
+          closeSugg(); changed();
+          priceIn.focus();
+        }
+      }, el('span', {}, rec.name), el('span', { class: 'p' }, priceTxt));
+    }));
+    sugg.hidden = false;
+  };
+  nameIn.addEventListener('input', () => { item.name = nameIn.value; save(); showSugg(); updateCard(card, item); renderTotals(); });
+  nameIn.addEventListener('focus', showSugg);
+  nameIn.addEventListener('blur', () => { setTimeout(closeSugg, 120); if (inCart(item)) { rememberPrice(sid, item); updateCard(card, item); } });
+  nameIn.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeSugg();
+    if (e.key === 'Enter') { e.preventDefault(); closeSugg(); priceIn.focus(); }
+  });
+  priceIn.addEventListener('input', () => {
+    item.price = priceIn.value.replace(/[^\d.,]/g, '');
+    if (priceIn.value !== item.price) priceIn.value = item.price;
+    if (toCents(item.price) && !inCart(item)) item.checked = true; // prix tapé en rayon = article pris
+    changed();
+  });
+  priceIn.addEventListener('blur', () => { if (inCart(item)) { rememberPrice(sid, item); updateCard(card, item); } });
   priceIn.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addItem(); } });
   qtyIn.addEventListener('input', () => { item.qty = Math.max(0, Math.floor(num(qtyIn.value))); changed(); });
   qtyIn.addEventListener('blur', () => { qtyIn.value = String(item.qty); });
@@ -661,8 +809,12 @@ function itemCard(item) {
   [priceIn, qtyIn].forEach(i => i.addEventListener('focus', () => i.select()));
   const step = d => { item.qty = Math.max(0, item.qty + d); qtyIn.value = String(item.qty); changed(); };
 
+  const check = el('button', {
+    class: 'check', role: 'checkbox', 'aria-label': 'Dans le caddie',
+    onclick: () => { item.checked = !inCart(item); if (item.checked) rememberPrice(sid, item); changed(); }
+  }, '✓');
   card.append(
-    el('div', { class: 'r1' }, nameIn,
+    el('div', { class: 'r1' }, check, el('div', { class: 'name-wrap' }, nameIn, sugg),
       el('button', { class: 'del', 'aria-label': 'Supprimer l\'article', onclick: () => removeItem(item.id) }, '✕')),
     el('div', { class: 'r2' },
       el('label', { class: 'price' }, priceIn, el('span', {}, '€')),
@@ -673,7 +825,8 @@ function itemCard(item) {
     el('div', { class: 'r3' },
       el('button', { class: 'tag', onclick: () => openPromo(item) }),
       el('span', { class: 'cag' }),
-      el('span', { class: 'hint' }))
+      el('span', { class: 'hint' }),
+      el('div', { class: 'cmp' }))
   );
   updateCard(card, item);
   return card;
@@ -681,6 +834,9 @@ function itemCard(item) {
 
 function updateCard(card, item) {
   const c = lineCalc(item);
+  card.classList.toggle('todo', !inCart(item));
+  $('.check', card).setAttribute('aria-checked', String(inCart(item)));
+  drawCompare($('.cmp', card), card, item, c.unit);
   $('.lt-pay', card).textContent = money(c.pay);
   $('.lt-base', card).textContent = c.saved > 0 ? money(c.base) : '';
   const tag = $('.tag', card);
@@ -696,6 +852,40 @@ function updateCard(card, item) {
       ? `Prends-en ${h.k} de plus : ${h.k > 1 ? 'ils sont offerts' : 'il est offert'}`
       : `Encore ${h.k} → seulement +${money(h.extra)}`;
   } else hint.textContent = '';
+}
+
+// Ligne de comparaison : autre magasin moins/plus cher, évolution du prix ici
+function drawCompare(box, card, item, unit) {
+  const sid = state.active;
+  const rec = state.prices[normKey(item.name)];
+  const parts = [];
+  if (rec) {
+    let best = null;
+    for (const [k, r] of Object.entries(rec.byStore)) {
+      if (k === sid) continue;
+      const st = state.stores.find(x => x.id === k);
+      if (st && (!best || r.price < best.r.price)) best = { st, r };
+    }
+    if (best) {
+      const d = best.r.price - unit;
+      if (!unit) parts.push(`${best.st.name} : ${money(best.r.price)}`);
+      else if (d < 0) parts.push(el('span', { class: 'good' }, `Moins cher chez ${best.st.name} : ${money(best.r.price)} (−${money(-d)})`));
+      else if (d > 0) parts.push(`${best.st.name} : ${money(best.r.price)} (+${money(d)})`);
+      else parts.push(`Même prix chez ${best.st.name}`);
+    }
+    const here = rec.byStore[sid];
+    if (here && unit && here.item === item.id && here.prev && here.prev !== unit) {
+      const d = unit - here.prev;
+      parts.push(el('span', { class: d > 0 ? 'bad' : 'good' }, `${d > 0 ? '↑ +' : '↓ −'}${money(Math.abs(d))} depuis la dernière fois`));
+    } else if (here && !unit && here.item !== item.id) {
+      parts.push(el('button', { type: 'button', onclick: () => {
+        item.price = centsToField(here.price);
+        const pi = $('.price input', card); if (pi) pi.value = item.price;
+        updateCard(card, item); renderTotals(); save();
+      } }, `Dernier prix ici : ${money(here.price)} – utiliser`));
+    }
+  }
+  box.replaceChildren(...parts.flatMap((x, i) => i ? [' · ', x] : [x]));
 }
 
 function renderList() {
@@ -716,6 +906,8 @@ function renderTotals() {
   $('#rCag').textContent = money(t.cag);
   $('#rCagRow').hidden = t.cag === 0;
   $('#rPay').textContent = money(t.pay);
+  $('#rTodo').textContent = t.todo ? `Encore à prendre : ${t.todo} article${t.todo > 1 ? 's' : ''}${t.todoPay ? ` (≈ ${money(t.todoPay)})` : ''}` : '';
+  $('#rTodo').hidden = !t.todo;
   document.querySelectorAll('#tabs .tab').forEach(tab => {
     $('.tab-total', tab).textContent = money(totalsFor(tab.dataset.id).pay);
   });
@@ -723,12 +915,29 @@ function renderTotals() {
   const pay = all.reduce((a, x) => a + x.pay, 0);
   const saved = all.reduce((a, x) => a + x.saved, 0);
   const cag = all.reduce((a, x) => a + x.cag, 0);
-  $('#btLabel').textContent = all.length > 1 ? `Total des ${all.length} magasins` : 'Total';
+  const todoPay = all.reduce((a, x) => a + x.todoPay, 0);
+  $('#btLabel').textContent = all.length > 1 ? `Dans le caddie · ${all.length} magasins` : 'Dans le caddie';
   $('#btTotal').textContent = money(pay);
   const bits = [];
   if (saved > 0) bits.push(`${money(saved)} économisés`);
   if (cag > 0) bits.push(`${money(cag)} cagnottés`);
   $('#btSave').textContent = bits.join(' + ');
+  // Budget
+  const b = state.budget;
+  $('#btBudget').hidden = !b;
+  if (b) {
+    const ratio = pay / b;
+    const level = ratio > 1 ? 'over' : ratio >= 0.9 ? 'warn' : '';
+    $('#btBar').className = 'bar ' + level;
+    $('#btBar i').style.width = Math.min(100, ratio * 100) + '%';
+    const txt = $('#btBudgetTxt');
+    txt.className = 'bt-budget ' + level;
+    txt.textContent = ratio > 1
+      ? `Budget dépassé de ${money(pay - b)}`
+      : `Reste ${money(b - pay)} sur ${money(b)}${todoPay ? ` · liste ≈ ${money(pay + todoPay)}` : ''}`;
+    if (ratio > 1 && !renderTotals.wasOver) toast(`Attention : budget de ${money(b)} dépassé`);
+    renderTotals.wasOver = ratio > 1;
+  }
 }
 
 function render() { renderTabs(); renderList(); renderTotals(); }
@@ -736,7 +945,7 @@ function render() { renderTabs(); renderList(); renderTotals(); }
 /* ============ Actions articles ============ */
 function addItem() {
   const st = activeStore();
-  const item = { id: uid(), name: '', price: '', qty: 1, promo: { type: 'none' } };
+  const item = { id: uid(), name: '', price: '', qty: 1, promo: { type: 'none' }, checked: false };
   state.items[st.id].push(item);
   save();
   const card = itemCard(item);
@@ -840,6 +1049,7 @@ function closePromo() {
 /* ============ Menu ============ */
 $('#menuBtn').addEventListener('click', () => {
   $('#mHistCount').textContent = state.history.length ? `${state.history.length} liste${state.history.length > 1 ? 's' : ''} enregistrée${state.history.length > 1 ? 's' : ''}` : 'Aucune liste enregistrée';
+  $('#mBudgetTxt').textContent = state.budget ? `${money(state.budget)} pour cette sortie` : 'Aucun budget fixé';
   $('#versionLine').textContent = `Version ${APP_VERSION}${IS_APP ? ' · application Android' : ''}`;
   applyTheme();
   openSheet($('#menuSheet'));
@@ -854,12 +1064,48 @@ $('#mSave').addEventListener('click', () => {
     items: state.items[st.id].filter(i => i.name || i.price).map(i => JSON.parse(JSON.stringify(i)))
   })).filter(s => s.items.length);
   if (!stores.length) { toast('Rien à enregistrer : les listes sont vides'); return; }
+  for (const st of enabledStores()) for (const it of state.items[st.id]) if (inCart(it)) rememberPrice(st.id, it, { silent: true });
   state.history.unshift({ id: uid(), ts: Date.now(), stores });
   state.history = state.history.slice(0, 60);
   flush();
   $('#menuSheet').close();
   toast('Liste enregistrée dans l\'historique');
 });
+$('#mBudget').addEventListener('click', () => { $('#menuSheet').close(); openBudget(); });
+$('#btArea').addEventListener('click', openBudget);
+function openBudget() {
+  $('#budgetIn').value = state.budget ? centsToField(state.budget).replace(',00', '') : '';
+  $('#budgetChips').replaceChildren(...[30, 50, 80, 100, 150].map(v => el('button', {
+    class: 'chip', type: 'button', onclick: () => { $('#budgetIn').value = String(v); }
+  }, `${v} €`)));
+  openSheet($('#budgetSheet'));
+}
+function setBudget(c) {
+  state.budget = Math.max(0, c); renderTotals.wasOver = false; save(); renderTotals(); $('#budgetSheet').close();
+  toast(c ? `Budget fixé à ${money(c)}` : 'Budget retiré');
+}
+$('#budgetOk').addEventListener('click', () => setBudget(toCents($('#budgetIn').value)));
+$('#budgetOff').addEventListener('click', () => setBudget(0));
+$('#budgetIn').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); setBudget(toCents($('#budgetIn').value)); } });
+
+$('#mMem').addEventListener('click', () => { $('#menuSheet').close(); $('#memSearch').value = ''; drawMem(); openSheet($('#memSheet')); });
+$('#memSearch').addEventListener('input', drawMem);
+function drawMem() {
+  const q = normKey($('#memSearch').value);
+  const rows = Object.entries(state.prices).filter(([k]) => !q || k.includes(q)).sort((a, b) => a[1].name.localeCompare(b[1].name, 'fr'));
+  if (!rows.length) {
+    $('#memList').replaceChildren(el('p', { class: 'empty' }, q ? 'Aucun article trouvé.' : 'Aucun prix retenu pour l\'instant : ils s\'ajoutent quand tu saisis un article avec son prix.'));
+    return;
+  }
+  $('#memList').replaceChildren(...rows.map(([k, rec]) => el('div', { class: 'mem-row' },
+    el('strong', {}, rec.name),
+    el('button', { class: 'del', 'aria-label': `Oublier ${rec.name}`, onclick: () => { delete state.prices[k]; save(); drawMem(); } }, '✕'),
+    el('span', { class: 'sub' }, Object.entries(rec.byStore).map(([sid, r]) => {
+      const st = state.stores.find(x => x.id === sid);
+      return st ? `${st.name} ${money(r.price)}` : null;
+    }).filter(Boolean).join(' · ') || '—'))));
+}
+
 $('#mHist').addEventListener('click', () => { $('#menuSheet').close(); showHistory(); openSheet($('#histSheet')); });
 $('#mStores').addEventListener('click', () => { $('#menuSheet').close(); drawStores(); openSheet($('#storesSheet')); });
 $('#mExport').addEventListener('click', exportData);
@@ -868,7 +1114,7 @@ $('#importFile').addEventListener('change', importData);
 
 /* ============ Historique ============ */
 const dateFR = ts => new Date(ts).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-const snapTotal = snap => snap.stores.reduce((a, s) => a + s.items.reduce((b, i) => b + lineCalc(i).pay, 0), 0);
+const snapTotal = snap => snap.stores.reduce((a, s) => a + s.items.filter(inCart).reduce((b, i) => b + lineCalc(i).pay, 0), 0);
 function showHistory() {
   const body = $('#histBody');
   $('#histTitle').textContent = 'Historique';
@@ -885,14 +1131,14 @@ function showSnap(h) {
   $('#histTitle').textContent = dateFR(h.ts);
   const parts = [el('button', { class: 'link-btn', style: 'justify-self:start', onclick: showHistory }, '← Toutes les listes')];
   for (const s of h.stores) {
-    const tot = s.items.reduce((a, i) => a + lineCalc(i).pay, 0);
+    const tot = s.items.filter(inCart).reduce((a, i) => a + lineCalc(i).pay, 0);
     parts.push(el('div', {},
       el('h3', { style: `display:flex;align-items:center;gap:8px;margin-bottom:4px;--store:${s.color}` }, el('span', { class: 'dot' }), s.name),
       el('table', { class: 'hist-table' }, el('tbody', {}, s.items.map(i => {
         const c = lineCalc(i); const pl = promoLabel(i.promo);
         return el('tr', {},
-          el('td', {}, i.name || 'Sans nom', el('span', { class: 'sub' }, `${i.qty} × ${money(c.unit)}${pl ? ' · ' + pl : ''}`)),
-          el('td', {}, money(c.pay)));
+          el('td', {}, i.name || 'Sans nom', el('span', { class: 'sub' }, `${i.qty} × ${money(c.unit)}${pl ? ' · ' + pl : ''}${inCart(i) ? '' : ' · pas pris'}`)),
+          el('td', {}, inCart(i) ? money(c.pay) : '–'));
       }), el('tr', {}, el('td', {}, el('strong', {}, 'Total')), el('td', {}, money(tot)))))));
   }
   parts.push(el('div', { class: 'btns' },
@@ -911,11 +1157,12 @@ function restoreSnap(h) {
     let st = state.stores.find(x => x.id === s.id);
     if (!st) { st = { id: s.id, name: s.name, color: s.color, enabled: true }; state.stores.push(st); }
     st.enabled = true;
-    state.items[st.id] = s.items.map(i => ({ ...JSON.parse(JSON.stringify(i)), id: uid() }));
+    // liste à refaire : tout est décoché, les prix servent d'estimation
+    state.items[st.id] = s.items.map(i => ({ ...JSON.parse(JSON.stringify(i)), id: uid(), checked: false, memKey: undefined }));
   }
   state.active = h.stores[0].id;
   flush(); $('#histSheet').close(); render();
-  toast('Liste rechargée');
+  toast('Liste rechargée : coche les articles au fur et à mesure');
 }
 
 /* ============ Magasins ============ */
@@ -1028,7 +1275,7 @@ function ask(msg, okLabel = 'Confirmer') {
   });
 }
 let toastTimer = null;
-function toast(msg, actionLabel = '', action = null) {
+function toast(msg, actionLabel = '', action = null, duration = 0) {
   const t = $('#toast');
   $('span', t).textContent = msg;
   const b = $('button', t);
@@ -1036,7 +1283,7 @@ function toast(msg, actionLabel = '', action = null) {
   b.onclick = () => { t.classList.remove('show'); if (action) action(); };
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), action ? 5000 : 2600);
+  toastTimer = setTimeout(() => t.classList.remove('show'), duration || (action ? 5000 : 2600));
 }
 
 /* ============ Ouverture / fermeture des feuilles ============ */
@@ -1081,8 +1328,28 @@ if ('serviceWorker' in navigator && !IS_APP) {
     if (hadController) toast('Nouvelle version installée', 'Recharger', () => { flush(); location.reload(); });
   });
 }
+// Dans l'APK : on regarde la dernière version publiée sur GitHub
+const REPO = 'Duranaeducan/Comparateur-de-Prix-';
+const APK_URL = `https://github.com/${REPO}/releases/latest/download/Comparateur.apk`;
+const cmpVer = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
+async function checkAppUpdate(manual) {
+  try {
+    const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    const m = /v(\d+(?:\.\d+)+)/.exec((await r.json()).name || '');
+    try { localStorage.setItem('cp-last-update-check', String(Date.now())); } catch {}
+    if (m && cmpVer(m[1], APP_VERSION) > 0) {
+      toast(`Version ${m[1]} disponible`, 'Télécharger', () => { location.href = APK_URL; }, 15000);
+    } else if (manual) toast(`Tu as la dernière version (${APP_VERSION})`);
+  } catch { if (manual) toast('Impossible de vérifier : pas de connexion ?'); }
+}
+if (IS_APP) {
+  let last = 0; try { last = +localStorage.getItem('cp-last-update-check') || 0; } catch {}
+  if (Date.now() - last > 6 * 3600e3) setTimeout(() => checkAppUpdate(false), 2500);
+}
 $('#mUpdate').addEventListener('click', async () => {
   $('#menuSheet').close();
+  if (IS_APP) { toast('Recherche…'); checkAppUpdate(true); return; }
   if (!swReg) { toast('Mises à jour indisponibles ici (ouvre l\'app via son adresse https)'); return; }
   toast('Recherche…');
   try {
@@ -1096,7 +1363,7 @@ $('#mUpdate').addEventListener('click', async () => {
 $('#addRow').addEventListener('click', addItem);
 $('#fab').addEventListener('click', addItem);
 $('#clearBtn').addEventListener('click', clearStore);
-if (IS_APP) { $('#mUpdate').hidden = true; $('#mInstall').hidden = true; }
+if (IS_APP) { $('#mInstall').hidden = true; }
 applyTheme();
 render();
 
