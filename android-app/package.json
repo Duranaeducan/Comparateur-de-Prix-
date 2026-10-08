@@ -1,7 +1,7 @@
 {
   "name": "comparateur-prix-android",
   "private": true,
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Emballage Android (Capacitor) du comparateur de prix",
   "dependencies": {
     "@capacitor/android": "8.5.3",

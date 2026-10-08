@@ -5,7 +5,7 @@
     🛒 COMPARATEUR DE PRIX — calculateur de courses multi-magasins
     ========================================
 
-    VERSION : 2.1.0  (8 octobre 2026)
+    VERSION : 2.2.0  (8 octobre 2026)
 
     À CHAQUE MODIFICATION :
       1. Changer APP_VERSION plus bas dans le <script>
@@ -14,6 +14,7 @@
          sur le réseau en priorité, donc plus besoin de vider les caches)
 
     HISTORIQUE :
+    - 2.2.0 : Vérification du ticket de caisse (ligne par ligne + total, écarts calculés).
     - 2.1.0 : Mémoire des prix par magasin (suggestions, comparaison, évolution),
               liste à cocher « dans le caddie », budget avec barre, alerte de mise à jour dans l'APK.
     - 2.0.0 : Refonte complète. Nouveau moteur de promos (2ᵉ à −X %, N+M offerts,
@@ -217,6 +218,8 @@ header.top { padding: calc(10px + env(safe-area-inset-top)) 0 0; }
 .recap-total .num { font-size: 30px; font-weight: 700; }
 .recap-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
 .recap-todo { margin-top: 8px; font-size: 14px; color: var(--muted); }
+.recap-actions { gap: 14px; flex-wrap: wrap; }
+.ticket-btn { width: 100%; margin-top: 12px; height: 46px; border-radius: 12px; background: var(--field); font-weight: 700; color: var(--ink); }
 .link-btn { color: var(--muted); font-size: 14px; padding: 8px 4px; text-decoration: underline; text-underline-offset: 3px; }
 .link-btn.danger:hover { color: var(--danger); }
 
@@ -239,6 +242,29 @@ header.top { padding: calc(10px + env(safe-area-inset-top)) 0 0; }
 .bt-budget { font-size: 12px; color: var(--muted); }
 .bt-budget.warn { color: var(--warn); font-weight: 600; }
 .bt-budget.over { color: var(--danger); font-weight: 700; }
+/* ---------- Vérification du ticket ---------- */
+.tk-list { display: grid; gap: 8px; }
+.tk-row { background: var(--field); border-radius: 12px; padding: 10px 12px; display: grid; grid-template-columns: auto 1fr auto; gap: 4px 12px; align-items: center; }
+.tk-row.ok { background: color-mix(in srgb, var(--save) 12%, var(--card)); }
+.tk-row.bad { background: color-mix(in srgb, var(--danger) 12%, var(--card)); }
+.tk-row .check[aria-checked="true"] { background: var(--save); border-color: var(--save); }
+.tk-row.bad .check { background: var(--danger); border-color: var(--danger); color: #fff; }
+.tk-info { min-width: 0; }
+.tk-info strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-amt { text-align: right; display: grid; justify-items: end; gap: 2px; }
+.tk-amt .num { font-size: 20px; font-weight: 700; }
+.tk-diff { font-size: 13px; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; padding: 2px 0; }
+.tk-edit { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding-top: 6px; }
+.tk-edit input { width: 110px; height: 42px; border-radius: 10px; border: 0; background: var(--card); padding: 0 10px; font: 600 18px var(--num); text-align: right; }
+.tk-edit input:focus { outline: none; box-shadow: inset 0 0 0 2px var(--brand); }
+.tk-res { font-size: 14px; font-weight: 600; }
+.tk-res.bad { color: var(--danger); } .tk-res.good { color: var(--save); }
+.tk-sum { position: sticky; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); display: grid; gap: 8px; }
+.tk-sum .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.tk-sum .big { font: 700 22px var(--num); }
+.tk-sum input { width: 120px; height: 42px; border-radius: 10px; border: 0; background: var(--field); padding: 0 10px; font: 600 18px var(--num); text-align: right; }
+.tk-verdict { font-weight: 700; font-size: 15px; }
+.tk-verdict.bad { color: var(--danger); } .tk-verdict.good { color: var(--save); }
 .mem-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .mem-row .sub { grid-column: 1; }
 .mem-row .del { grid-row: 1 / span 2; grid-column: 2; }
@@ -358,6 +384,7 @@ dialog.sheet::backdrop { background: rgb(8 9 18 / .55); }
     <div class="recap-row cagn" id="rCagRow"><span>Cagnotté (sur ta carte)</span><span class="num" id="rCag"></span></div>
     <div class="recap-total"><span id="rLabel">À payer</span><span class="num" id="rPay"></span></div>
     <div class="recap-todo" id="rTodo"></div>
+    <button class="ticket-btn" id="ticketBtn">🧾 Vérifier le ticket de caisse</button>
     <div class="recap-actions"><button class="link-btn danger" id="clearBtn">Vider la liste de ce magasin</button></div>
   </section>
 </main>
@@ -410,6 +437,7 @@ dialog.sheet::backdrop { background: rgb(8 9 18 / .55); }
     <div class="menu-list">
       <button class="menu-item" id="mSave"><span class="ic">💾</span><span>Enregistrer dans l'historique<small>Garde une copie des listes de tous les magasins</small></span></button>
       <button class="menu-item" id="mHist"><span class="ic">📋</span><span>Historique<small id="mHistCount"></small></span></button>
+      <button class="menu-item" id="mTicket"><span class="ic">🧾</span><span>Vérifier le ticket<small>Comparer ton ticket de caisse avec la liste</small></span></button>
       <button class="menu-item" id="mBudget"><span class="ic">🎯</span><span>Budget<small id="mBudgetTxt"></small></span></button>
       <button class="menu-item" id="mMem"><span class="ic">🏷️</span><span>Prix mémorisés<small>Les prix retenus pour chaque article et magasin</small></span></button>
       <button class="menu-item" id="mStores"><span class="ic">🏪</span><span>Magasins<small>Ajouter, renommer, masquer</small></span></button>
@@ -438,6 +466,24 @@ dialog.sheet::backdrop { background: rgb(8 9 18 / .55); }
       <label class="field" style="flex:1"><span class="sr" hidden>Nom</span><input type="text" id="newStore" placeholder="Ex. Carrefour Market" enterkeyhint="done"></label>
       <button class="btn primary" id="addStore" style="flex:0 0 auto;padding:0 18px;height:46px">Ajouter</button>
     </div>
+  </div>
+</dialog>
+
+<!-- Vérification du ticket -->
+<dialog class="sheet" id="ticketSheet" aria-labelledby="ticketTitle">
+  <div class="sh-head"><h2 id="ticketTitle">Vérifier le ticket</h2><button class="close" data-close aria-label="Fermer">✕</button></div>
+  <div class="sh-body">
+    <p class="sub">Lis ton ticket ligne par ligne : coche ✓ ce qui correspond. Si un montant est différent, touche « Écart ? » et tape le montant du ticket.</p>
+    <label class="field">Chercher un article<input type="text" id="tkSearch" placeholder="Nom sur le ticket" autocomplete="off"></label>
+    <div class="tk-list" id="tkList"></div>
+    <p class="sub" id="tkNote"></p>
+    <button class="link-btn" id="tkReset" style="justify-self:start">Tout recommencer</button>
+  </div>
+  <div class="tk-sum">
+    <div class="row"><span id="tkProgress"></span><span class="tk-verdict" id="tkDiffs"></span></div>
+    <div class="row"><span>Total attendu</span><span class="big" id="tkExpected"></span></div>
+    <div class="row"><label for="tkTotal">Total du ticket</label><input id="tkTotal" type="text" inputmode="decimal" placeholder="0,00"></div>
+    <div class="tk-verdict" id="tkVerdict"></div>
   </div>
 </dialog>
 
@@ -478,7 +524,7 @@ dialog.sheet::backdrop { background: rgb(8 9 18 / .55); }
 
 <script>
 'use strict';
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.2.0';
 // Vrai quand la page tourne dans l'APK Android (Capacitor), faux dans le navigateur
 const IS_APP = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
 const LS_KEY = 'cp2-state';
@@ -663,6 +709,7 @@ function normalize(s) {
   }
   if (!Array.isArray(s.history)) s.history = [];
   s.budget = Math.max(0, Math.round(num(s.budget)));
+  if (!s.ticket || typeof s.ticket !== 'object') s.ticket = {};
   if (!s.prices || typeof s.prices !== 'object') buildPricesFromHistory(s);
   if (!['auto', 'light', 'dark'].includes(s.theme)) s.theme = 'auto';
   if (!s.stores.some(x => x.id === s.active && x.enabled)) s.active = (s.stores.find(x => x.enabled) || s.stores[0]).id;
@@ -908,6 +955,7 @@ function renderTotals() {
   $('#rPay').textContent = money(t.pay);
   $('#rTodo').textContent = t.todo ? `Encore à prendre : ${t.todo} article${t.todo > 1 ? 's' : ''}${t.todoPay ? ` (≈ ${money(t.todoPay)})` : ''}` : '';
   $('#rTodo').hidden = !t.todo;
+  $('#ticketBtn').hidden = !t.count && !t.pay;
   document.querySelectorAll('#tabs .tab').forEach(tab => {
     $('.tab-total', tab).textContent = money(totalsFor(tab.dataset.id).pay);
   });
@@ -972,8 +1020,9 @@ function clearStore() {
   const backup = state.items[st.id];
   if (!backup.length) return;
   state.items[st.id] = [];
+  const tkBackup = state.ticket[st.id]; delete state.ticket[st.id];
   save(); renderList(); renderTotals();
-  toast(`Liste ${st.name} vidée`, 'Annuler', () => { state.items[st.id] = backup; save(); renderList(); renderTotals(); });
+  toast(`Liste ${st.name} vidée`, 'Annuler', () => { state.items[st.id] = backup; if (tkBackup) state.ticket[st.id] = tkBackup; save(); renderList(); renderTotals(); });
 }
 
 /* ============ Feuille Promo ============ */
@@ -1071,6 +1120,109 @@ $('#mSave').addEventListener('click', () => {
   $('#menuSheet').close();
   toast('Liste enregistrée dans l\'historique');
 });
+/* ============ Vérification du ticket ============ */
+// state.ticket[storeId] = { rows: { [itemId]: { ok: bool, got: centimes|null } }, total: centimes|null }
+function ticketOf(sid) {
+  state.ticket = state.ticket || {};
+  return state.ticket[sid] || (state.ticket[sid] = { rows: {}, total: null });
+}
+function openTicket() {
+  const st = activeStore();
+  if (!state.items[st.id].some(i => inCart(i) && (i.name || i.price))) { toast('Coche d\'abord les articles pris pour vérifier le ticket'); return; }
+  $('#ticketTitle').textContent = `Ticket ${st.name}`;
+  $('#tkSearch').value = '';
+  const tk = ticketOf(st.id);
+  $('#tkTotal').value = tk.total != null ? centsToField(tk.total) : '';
+  drawTicket();
+  openSheet($('#ticketSheet'));
+}
+function drawTicket() {
+  const st = activeStore(), tk = ticketOf(st.id);
+  const q = normKey($('#tkSearch').value);
+  const items = state.items[st.id].filter(i => inCart(i) && (i.name || i.price));
+  $('#tkList').replaceChildren(...items.filter(i => !q || normKey(i.name).includes(q)).map(i => ticketRow(i, tk)));
+  const left = state.items[st.id].filter(i => !inCart(i) && (i.name || i.price)).length;
+  $('#tkNote').textContent = left ? left > 1 ? `${left} articles non cochés dans la liste ne sont pas comptés ici.` : '1 article non coché dans la liste n\'est pas compté ici.' : '';
+  $('#tkNote').hidden = !left;
+  drawTicketSummary();
+}
+function ticketRow(item, tk) {
+  const c = lineCalc(item);
+  const r = tk.rows[item.id] || {};
+  const pl = promoLabel(item.promo);
+  const row = el('div', { class: 'tk-row' + (r.got != null && r.got !== c.pay ? ' bad' : r.ok ? ' ok' : '') });
+  const input = el('input', { type: 'text', inputmode: 'decimal', placeholder: centsToField(c.pay), value: r.got != null ? centsToField(r.got) : '', 'aria-label': 'Montant sur le ticket' });
+  const res = el('span', { class: 'tk-res' });
+  const edit = el('div', { class: 'tk-edit', hidden: r.got == null }, 'Sur le ticket :', input, '€', res);
+  const showRes = () => {
+    const cur = tk.rows[item.id] || {};
+    if (cur.got == null) { res.textContent = ''; return; }
+    const d = cur.got - c.pay;
+    res.className = 'tk-res ' + (d > 0 ? 'bad' : 'good');
+    res.textContent = d === 0 ? 'Correct' : d > 0 ? `${money(d)} de trop` : `${money(-d)} en ta faveur`;
+  };
+  const update = () => { save(); row.className = 'tk-row' + ((tk.rows[item.id] || {}).got != null && tk.rows[item.id].got !== c.pay ? ' bad' : (tk.rows[item.id] || {}).ok ? ' ok' : ''); check.setAttribute('aria-checked', String(!!(tk.rows[item.id] || {}).ok)); check.textContent = (tk.rows[item.id] || {}).got != null && tk.rows[item.id].got !== c.pay ? '!' : '✓'; showRes(); drawTicketSummary(); };
+  input.addEventListener('input', () => {
+    const v = input.value.trim();
+    tk.rows[item.id] = v === '' ? { ok: false, got: null } : { ok: true, got: toCents(v) };
+    update();
+  });
+  input.addEventListener('focus', () => input.select());
+  const check = el('button', { class: 'check', role: 'checkbox', 'aria-label': `${item.name || 'Article'} conforme`, onclick: () => {
+    const cur = tk.rows[item.id] || {};
+    tk.rows[item.id] = cur.ok ? { ok: false, got: null } : { ok: true, got: null };
+    input.value = ''; edit.hidden = true;
+    update();
+  } }, '✓');
+  row.append(
+    check,
+    el('div', { class: 'tk-info' }, el('strong', {}, item.name || 'Sans nom'),
+      el('span', { class: 'sub' }, `${c.qty} × ${money(c.unit)}${pl ? ' · ' + pl : ''}${c.saved ? ` (−${money(c.saved)})` : ''}`)),
+    el('div', { class: 'tk-amt' }, el('span', { class: 'num' }, money(c.pay)),
+      el('button', { class: 'tk-diff', onclick: () => { edit.hidden = !edit.hidden; if (!edit.hidden) input.focus(); } }, 'Écart ?')),
+    edit
+  );
+  update();
+  return row;
+}
+function drawTicketSummary() {
+  const st = activeStore(), tk = ticketOf(st.id);
+  const items = state.items[st.id].filter(i => inCart(i) && (i.name || i.price));
+  const t = totalsFor(st.id);
+  let done = 0, over = 0, under = 0;
+  for (const i of items) {
+    const r = tk.rows[i.id]; if (!r || !r.ok) continue;
+    done++;
+    if (r.got != null) { const d = r.got - lineCalc(i).pay; if (d > 0) over += d; else under -= d; }
+  }
+  $('#tkProgress').textContent = `${done} / ${items.length} vérifié${done > 1 ? 's' : ''}`;
+  const diffs = $('#tkDiffs');
+  diffs.className = 'tk-verdict ' + (over ? 'bad' : done === items.length && items.length ? 'good' : '');
+  diffs.textContent = over ? `${money(over)} de trop` : done === items.length && items.length ? (under ? `${money(under)} en ta faveur` : 'Aucun écart') : '';
+  $('#tkExpected').textContent = money(t.pay);
+  const v = $('#tkVerdict');
+  if (tk.total == null) { v.textContent = t.cag ? `Pense à vérifier aussi les ${money(t.cag)} cagnottés sur ta carte.` : ''; v.className = 'tk-verdict'; return; }
+  const d = tk.total - t.pay;
+  v.className = 'tk-verdict ' + (d > 0 ? 'bad' : 'good');
+  v.textContent = d === 0 ? 'Le total est juste, au centime près.'
+    : d > 0 ? `Le ticket est plus cher de ${money(d)}${over ? '' : ' : cherche la ligne en cause ci-dessus'}. Montre-le à l'accueil.`
+    : `Le ticket est moins cher de ${money(-d)} que prévu.`;
+}
+$('#tkTotal').addEventListener('input', () => {
+  const tk = ticketOf(activeStore().id);
+  tk.total = $('#tkTotal').value.trim() === '' ? null : toCents($('#tkTotal').value);
+  save(); drawTicketSummary();
+});
+$('#tkTotal').addEventListener('focus', e => e.target.select());
+$('#tkSearch').addEventListener('input', drawTicket);
+$('#tkReset').addEventListener('click', () => {
+  const sid = activeStore().id, backup = state.ticket[sid];
+  state.ticket[sid] = { rows: {}, total: null }; $('#tkTotal').value = ''; save(); drawTicket();
+  toast('Vérification remise à zéro', 'Annuler', () => { state.ticket[sid] = backup; $('#tkTotal').value = backup.total != null ? centsToField(backup.total) : ''; save(); drawTicket(); });
+});
+$('#ticketBtn').addEventListener('click', openTicket);
+$('#mTicket').addEventListener('click', () => { $('#menuSheet').close(); openTicket(); });
+
 $('#mBudget').addEventListener('click', () => { $('#menuSheet').close(); openBudget(); });
 $('#btArea').addEventListener('click', openBudget);
 function openBudget() {

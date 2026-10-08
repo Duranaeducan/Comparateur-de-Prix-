@@ -2,7 +2,7 @@
 // La page HTML est toujours demandée au réseau d'abord (copie en cache si hors ligne),
 // donc une nouvelle version publiée est visible au prochain lancement, sans bricolage.
 // Changer VERSION quand les polices ou icônes changent.
-const VERSION = '2.1.0';
+const VERSION = '2.2.0';
 const CACHE = `comparateur-prix-${VERSION}`;
 const PRECACHE = [
   './comparateur_prix.html',
